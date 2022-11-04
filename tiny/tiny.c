@@ -57,7 +57,7 @@ void doit(int fd){
       clienterror(fd, filename, "403", "Forbidden", ("Tiny couldn't read the file"));
       return;
     }
-    serv_static(fd, filename, sbuf.st_size);
+    serve_static(fd, filename, sbuf.st_size);
   }
   else {
     if ( !(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)) {
@@ -68,6 +68,21 @@ void doit(int fd){
   }
 }
 
+void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg){
+	char buf[MAXLINE], body[MAXBUF];
+
+	sprintf(body, "<html><title>Tiny Error</title>");
+	sprintf(body, "%s<body bgcolor=""ffffff"">\r\n", body);
+	sprintf(body, "%s%s: %s\r\n", body, errnum, shortmsg);
+	sprintf(body, "%s<p>%s: %s\r\n", body, longmsg, cause);
+	sprintf(body, "%s<hr><em>The Tiny Web Server</em>\r\n", body);
+
+	sprintf(buf, "HTTP/1.0 %s %s\r\n", errnum, shortmsg);
+	Rio_writen(fd, buf, strlen(buf));
+	sprintf(buf, "Content-tpye: text/html\r\n");
+	Rio_writen(fd, buf,strlen(buf));
+	Rio_writen(fd, body, strlen(body));
+}
 void read_requesthdrs(rio_t *rp){
   char buf[MAXLINE];
 
@@ -103,14 +118,14 @@ int parse_uri(char *uri, char *filename, char *cgiargs) {
   }
 }
 
-void serv_static(int fd, char* filename, int filesize) {
+void serve_static(int fd, char* filename, int filesize) {
   int srcfd;
   char *srcp, filetype[MAXLINE], buf[MAXBUF];
 
   get_filetype(filename, filetype);
   sprintf(buf, "HTTP/1.0 200 OK\r\n");
   sprintf(buf, "%sServer : tiny web server\r\n", buf);
-  sprintf(buf, "Connection: close \r\n", buf);
+  sprintf(buf, "%sConnection: close \r\n", buf);
   sprintf(buf, "%sContent-length: %d\r\n", buf, filesize);
   sprintf(buf, "%sContent-type: %s\r\n", buf, filetype);
   Rio_writen(fd, buf, strlen(buf));
@@ -124,7 +139,20 @@ void serv_static(int fd, char* filename, int filesize) {
   Munmap(srcp, filesize);
 }
 
-void serve_dynaimc(int fd, char *filename, char *cgiargs){
+void get_filetype(char *filename, char* filetype){
+	if (strstr(filename, ".html"))
+		strcpy(filetype, "text/html");
+	else if (strstr(filename, ".gif"))
+		strcpy(filetype, "image/gif");
+	else if (strstr(filename, ".png"))
+		strcpy(filetype, "image/png");
+	else if (strstr(filename, ".jpg"))
+		strcpy(filetype, "image/jpeg");
+	else 
+		strcpy(filetype, "image/plain");
+}
+
+void serve_dynamic(int fd, char *filename, char *cgiargs){
   char buf[MAXLINE], *emptylist[] = {NULL};
 
   sprintf(buf, "HTTP/1.0 200 OK\r\n");
