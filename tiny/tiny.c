@@ -37,31 +37,32 @@ void doit(int fd){
   Rio_readlineb(&rio, buf, MAXLINE); 
   printf("Request headers:\n");
   printf("%s", buf);
-  sscanf(buf, "%s, %s, %s", method, uri, version);
+  sscanf(buf, "%s %s %s", method, uri, version);
   if (strcasecmp(method, "GET")) {
     clienterror(fd, method, "501", "Nor implemented",
                 "Tiny does not implement this method");
     return;
   }
+  printf("유알아이리드헤드 위 %s\n",uri);
   read_requesthdrs(&rio);
-
   /*Parse URI from GET request */
+  printf("바깥유알아이 %s\n", uri);
   is_static = parse_uri(uri, filename, cgiargs);
   if (stat(filename, &sbuf) < 0) {
-    clienterror(fd, filename, "403", "Forbidden", "Tiny couldn't read the file");
+    clienterror(fd, filename, "404", "Not found file", "Tiny couldn't find this file");
     return;
   }
   if (is_static){
     if (!(S_ISREG(sbuf.st_mode)) || !(S_IRUSR & sbuf.st_mode)) // !(regular file) or  !(R for owner & [XSI] Mode of file)
     {
-      clienterror(fd, filename, "403", "Forbidden", ("Tiny couldn't read the file"));
+      clienterror(fd, filename, "403", "Forbidden", "Tiny couldn't read the file");
       return;
     }
     serve_static(fd, filename, sbuf.st_size);
   }
   else {
     if ( !(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)) {
-      clienterror(fd, filename, "403", "Forbidden", "Tiny couldn't read the file");
+      clienterror(fd, filename, "403", "Forbidden", "Tiny couldn't run the CGI program");
       return;
     }
     serve_dynamic(fd, filename, cgiargs);
@@ -101,7 +102,12 @@ int parse_uri(char *uri, char *filename, char *cgiargs) {
     strcpy(cgiargs, "");
     strcpy(filename, ".");
     strcat(filename, uri);
-    if (uri[strlen(uri)-1]=='/') strcat(filename, "home.html");
+    printf("in cgi-bin\n");
+    if (uri[strlen(uri)-1] == '/') {
+      strcat(filename, "home.html");
+    }
+    printf("유알아이 %s\n", uri);
+    printf("*filename* %s\n", filename);
     return 1;
   }
   else {
@@ -114,6 +120,7 @@ int parse_uri(char *uri, char *filename, char *cgiargs) {
       strcpy(cgiargs, "");
     strcpy(filename, "");
     strcat(filename, uri);
+    
     return 0;
   }
 }
@@ -121,16 +128,16 @@ int parse_uri(char *uri, char *filename, char *cgiargs) {
 void serve_static(int fd, char* filename, int filesize) {
   int srcfd;
   char *srcp, filetype[MAXLINE], buf[MAXBUF];
-
   get_filetype(filename, filetype);
   sprintf(buf, "HTTP/1.0 200 OK\r\n");
   sprintf(buf, "%sServer : tiny web server\r\n", buf);
   sprintf(buf, "%sConnection: close \r\n", buf);
   sprintf(buf, "%sContent-length: %d\r\n", buf, filesize);
   sprintf(buf, "%sContent-type: %s\r\n", buf, filetype);
-  Rio_writen(fd, buf, strlen(buf));
+  printf("리오 위에 %d %s %d", fd, buf, strlen(buf));
   printf("Response headers: \n");
   printf("%s", buf);
+
 
   srcfd = Open(filename, O_RDONLY, 0);
   srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
