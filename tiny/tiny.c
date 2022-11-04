@@ -43,10 +43,8 @@ void doit(int fd){
                 "Tiny does not implement this method");
     return;
   }
-  printf("유알아이리드헤드 위 %s\n",uri);
   read_requesthdrs(&rio);
   /*Parse URI from GET request */
-  printf("바깥유알아이 %s\n", uri);
   is_static = parse_uri(uri, filename, cgiargs);
   if (stat(filename, &sbuf) < 0) {
     clienterror(fd, filename, "404", "Not found file", "Tiny couldn't find this file");
@@ -102,12 +100,9 @@ int parse_uri(char *uri, char *filename, char *cgiargs) {
     strcpy(cgiargs, "");
     strcpy(filename, ".");
     strcat(filename, uri);
-    printf("in cgi-bin\n");
     if (uri[strlen(uri)-1] == '/') {
       strcat(filename, "home.html");
     }
-    printf("유알아이 %s\n", uri);
-    printf("*filename* %s\n", filename);
     return 1;
   }
   else {
@@ -134,16 +129,14 @@ void serve_static(int fd, char* filename, int filesize) {
   sprintf(buf, "%sConnection: close \r\n", buf);
   sprintf(buf, "%sContent-length: %d\r\n", buf, filesize);
   sprintf(buf, "%sContent-type: %s\r\n", buf, filetype);
-  printf("리오 위에 %d %s %d", fd, buf, strlen(buf));
+  Rio_writen(fd, buf, strlen(buf));
   printf("Response headers: \n");
   printf("%s", buf);
-
-
   srcfd = Open(filename, O_RDONLY, 0);
   srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
   Close(srcfd);
   Rio_writen(fd, srcp, filesize);
-  Munmap(srcp, filesize);
+  Munmap(srcp, filesize); 
 }
 
 void get_filetype(char *filename, char* filetype){
