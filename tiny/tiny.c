@@ -16,7 +16,7 @@ void get_filetype(char *filename, char *filetype);
 void serve_dynamic(int fd, char *filename, char *cgiargs);
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg,
                  char *longmsg);
-
+void childHandler();
 //   typedef struct {
 //     int rio_fd;                /* Descriptor for this internal buf */
 //     int rio_cnt;               /* Unread bytes in internal buf */
@@ -39,7 +39,7 @@ void doit(int fd)
   printf("Request headers:\n");
   printf("%s", buf);
   sscanf(buf, "%s %s %s", method, uri, version);
-  if (strcasecmp(method, "GET"))
+  if (strcasecmp(method, "GET") && strcasecmp(method, "HEAD"))
   {
     clienterror(fd, method, "501", "Nor implemented",
                 "Tiny does not implement this method");
@@ -79,20 +79,20 @@ void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longms
   char buf[MAXLINE], body[MAXBUF];
 
   sprintf(body, "<html><title>Tiny Error</title>");
-  sprintf(body, "%s<body bgcolor="
-                "ffffff"
-                ">\r\n",
-          body);
+  sprintf(body, "%s<body bgcolor=""ffffff"">\r\n", body);
   sprintf(body, "%s%s: %s\r\n", body, errnum, shortmsg);
   sprintf(body, "%s<p>%s: %s\r\n", body, longmsg, cause);
   sprintf(body, "%s<hr><em>The Tiny Web Server</em>\r\n", body);
 
   sprintf(buf, "HTTP/1.0 %s %s\r\n", errnum, shortmsg);
   Rio_writen(fd, buf, strlen(buf));
-  sprintf(buf, "Content-tpye: text/html\r\n");
+  sprintf(buf, "Content-tpye: text/html\r\nn");
+  Rio_writen(fd, buf, strlen(buf));
+  sprintf(buf, "Content-length: %d\r\n\r\n", (int)strlen(body));
   Rio_writen(fd, buf, strlen(buf));
   Rio_writen(fd, body, strlen(body));
 }
+
 void read_requesthdrs(rio_t *rp)
 {
   char buf[MAXLINE];
@@ -131,9 +131,8 @@ int parse_uri(char *uri, char *filename, char *cgiargs)
     }
     else
       strcpy(cgiargs, "");
-    strcpy(filename, "");
+    strcpy(filename, ".");
     strcat(filename, uri);
-
     return 0;
   }
 }
@@ -151,15 +150,16 @@ void serve_static(int fd, char *filename, int filesize)
   Rio_writen(fd, buf, strlen(buf));
   printf("Response headers: \n");
   printf("%s", buf);
+
   srcfd = Open(filename, O_RDONLY, 0);
-  srcp = (char *)malloc(sizeof(char)*filesize);
+  srcp = (char *)malloc(sizeof(char) * filesize);
   Rio_readn(srcfd, srcp, filesize);
   // srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
-  // printf("srcfd %s", srcfd);
   Close(srcfd);
   Rio_writen(fd, srcp, filesize);
-  Munmap(srcp, filesize);
   free(srcp);
+  // Munmap(srcp, filesize);
+  
 }
 
 void get_filetype(char *filename, char *filetype)
@@ -172,27 +172,44 @@ void get_filetype(char *filename, char *filetype)
     strcpy(filetype, "image/png");
   else if (strstr(filename, ".jpg"))
     strcpy(filetype, "image/jpeg");
+  else if (strstr(filename, ".mpg"))
+    strcpy(filetype, "video/mpeg");
+  else if (strstr(filename, ".mp4"))
+    strcpy(filetype, "video/mp4");
   else
     strcpy(filetype, "image/plain");
+    
 }
 
 void serve_dynamic(int fd, char *filename, char *cgiargs)
 {
   char buf[MAXLINE], *emptylist[] = {NULL};
+  int pid;
 
   sprintf(buf, "HTTP/1.0 200 OK\r\n");
   Rio_writen(fd, buf, strlen(buf));
   sprintf(buf, "Server: Tiny Web sErver\r\n");
   Rio_writen(fd, buf, strlen(buf));
-
-  if (fork() == 0)
+  printf("filename %s \n buf %s\n", filename, buf);
+  signal(SIGCHLD, childHandler);
+  pid = Fork();
+  if (pid == 0)
   {
+    printf("filename %s \n buf %s\n", filename, buf);
     setenv("QUERY_STRING", cgiargs, 1);
     Dup2(fd, STDOUT_FILENO);
     Execve(filename, emptylist, environ);
+  } else {
+    kill(pid, SIGINT);
   }
-  Wait(NULL);
 }
+
+void childHandler(){
+  int childPId, childStatus;
+  childPId = wait(&childStatus);
+  printf("Child %d terminated. \n", childPId);
+}
+
 
 int main(int argc, char **argv)
 {
@@ -200,49 +217,25 @@ int main(int argc, char **argv)
   char hostname[MAXLINE], port[MAXLINE];
   socklen_t clientlen;
   struct sockaddr_storage clientaddr;
+
   /* Check command line args */
   if (argc != 2)
   {
     fprintf(stderr, "usage: %s <port>\n", argv[0]);
     exit(1);
   }
-  listenfd = Open_listenfd(argv[1]); // 듣기 소켓 오픈
-  /* 무한 서버 루프 */
+
+  listenfd = Open_listenfd(argv[1]);
   while (1)
   {
     clientlen = sizeof(clientaddr);
-    /* 연결 요청 접수 */
-    connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen); // line:netp:tiny:accept
-    Getnameinfo((SA *)&clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE, 0);
+    connfd = Accept(listenfd, (SA *)&clientaddr,
+                    &clientlen); // line:netp:tiny:accept
+    Getnameinfo((SA *)&clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE,
+                0);
     printf("Accepted connection from (%s, %s)\n", hostname, port);
-    /* Transaction 수행 */
-    doit(connfd); // line:netp:tiny:doit
-    /* 서버쪽 연결 종료 */
+    doit(connfd);  // line:netp:tiny:doit
     Close(connfd); // line:netp:tiny:close
   }
 }
 
-// int main(int argc, char **argv) {
-//   int listenfd, connfd;
-//   char hostname[MAXLINE], port[MAXLINE];
-//   socklen_t clientlen;
-//   struct sockaddr_storage clientaddr;
-
-//   /* Check command line args */
-//   if (argc != 2) {
-//     fprintf(stderr, "usage: %s <port>\n", argv[0]);
-//     exit(1);
-//   }
-
-//   listenfd = Open_listenfd(argv[1]);
-//   while (1) {
-//     clientlen = sizeof(clientaddr);
-//     connfd = Accept(listenfd, (SA *)&clientaddr,
-//                     &clientlen);  // line:netp:tiny:accept
-//     Getnameinfo((SA *)&clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE,
-//                 0);
-//     printf("Accepted connection from (%s, %s)\n", hostname, port);
-//     doit(connfd);   // line:netp:tiny:doit
-//     Close(connfd);  // line:netp:tiny:close
-//   }
-// }

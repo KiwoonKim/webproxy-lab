@@ -9,7 +9,18 @@ static const char *user_agent_hdr =
     "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:10.0.3) Gecko/20120305 "
     "Firefox/10.0.3\r\n";
 
-int main() {
+/*
+  squantial web proxy 
+*/
+
+int main(int ac, char **av) {
+
+  if (ac != 2){
+    fprintf(stderr, "put only one args. usage : %s <port>", av[0]);
+    exit(1);
+  }
+  
+  
   printf("%s", user_agent_hdr);
   return 0;
 }
