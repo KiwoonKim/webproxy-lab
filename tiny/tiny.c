@@ -159,7 +159,6 @@ void serve_static(int fd, char *filename, int filesize)
   Rio_writen(fd, srcp, filesize);
   free(srcp);
   // Munmap(srcp, filesize);
-  
 }
 
 void get_filetype(char *filename, char *filetype)
@@ -188,12 +187,18 @@ void serve_dynamic(int fd, char *filename, char *cgiargs)
 
   sprintf(buf, "HTTP/1.0 200 OK\r\n");
   Rio_writen(fd, buf, strlen(buf));
-  sprintf(buf, "Server: Tiny Web sErver\r\n");
+  sprintf(buf, "Server: Tiny Web Server\r\n");
   Rio_writen(fd, buf, strlen(buf));
   printf("filename %s \n buf %s\n", filename, buf);
+  if (Fork() == 0){
+    setenv("QUERY_STRING", cgiargs, 1);
+    Dup2(fd, STDOUT_FILENO);
+    Execve(filename, emptylist, environ);
+  }
+  Wait(NULL);
   signal(SIGCHLD, childHandler);
-  pid = Fork();
-  if (pid == 0)
+  
+  if (pid = Fork() == 0)
   {
     printf("filename %s \n buf %s\n", filename, buf);
     setenv("QUERY_STRING", cgiargs, 1);

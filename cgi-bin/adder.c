@@ -24,6 +24,8 @@ int main(void) {
     n1 = atoi(arg1);
     n2 = atoi(arg2);
   }
+  
+
   sprintf(content, "QUERY_STRING=%s", buf);
   sprintf(content, "Welcome to add.com: ");
   sprintf(content, "%sTHE internet addition portal.\r\n<p>", content);
