@@ -32,10 +32,11 @@ void doit(int fd)
   char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE];
   char filename[MAXLINE], cgiargs[MAXLINE];
   rio_t rio;
-
+  printf("check1\n");
   /* Read request line ands headers */
   Rio_readinitb(&rio, fd); // rio_fd = fd, rio_cnt = 0; rio_bufptr = rio_buf;
   Rio_readlineb(&rio, buf, MAXLINE);
+  
   printf("Request headers:\n");
   printf("%s", buf);
   sscanf(buf, "%s %s %s", method, uri, version);
@@ -45,6 +46,7 @@ void doit(int fd)
                 "Tiny does not implement this method");
     return;
   }
+  printf("check2\n");
 
   read_requesthdrs(&rio);
   /*Parse URI from GET request */
@@ -184,20 +186,23 @@ void serve_dynamic(int fd, char *filename, char *cgiargs)
 {
   char buf[MAXLINE], *emptylist[] = {NULL};
   int pid;
+  sigset_t mask, prev_mask;
 
   sprintf(buf, "HTTP/1.0 200 OK\r\n");
   Rio_writen(fd, buf, strlen(buf));
   sprintf(buf, "Server: Tiny Web Server\r\n");
   Rio_writen(fd, buf, strlen(buf));
   printf("filename %s \n buf %s\n", filename, buf);
-  if (Fork() == 0){
-    setenv("QUERY_STRING", cgiargs, 1);
-    Dup2(fd, STDOUT_FILENO);
-    Execve(filename, emptylist, environ);
-  }
-  Wait(NULL);
-  signal(SIGCHLD, childHandler);
+  // if (Fork() == 0){
+  //   setenv("QUERY_STRING", cgiargs, 1);
+  //   Dup2(fd, STDOUT_FILENO);
+  //   Execve(filename, emptylist, environ);
+  // }
+  // Wait(NULL);
   
+  signal(SIGCHLD, childHandler);
+  // Sigemptyset(&mask);
+  // Sigaddset(&mask, SIGINT);
   if (pid = Fork() == 0)
   {
     printf("filename %s \n buf %s\n", filename, buf);
@@ -205,7 +210,9 @@ void serve_dynamic(int fd, char *filename, char *cgiargs)
     Dup2(fd, STDOUT_FILENO);
     Execve(filename, emptylist, environ);
   } else {
+    // Sigprocmask(SIG_BLOCK, &mask, &prev_mask);
     kill(pid, SIGINT);
+    // Sigprocmask(SIG_SETMASK, &prev_mask, NULL);
   }
 }
 
