@@ -22,7 +22,7 @@ sbuf.o: sbuf.c csapp.h
 cache.o: cache.c csapp.h
 	$(CC) $(CFLAGS) -c cache.c
 
-proxy: proxy.o csapp.o
+proxy: proxy.o csapp.o sbuf.o cache.o
 	$(CC) $(CFLAGS) proxy.o csapp.o sbuf.o cache.o -o proxy $(LDFLAGS)
 
 # Creates a tarball in ../proxylab-handin.tar that you can then
