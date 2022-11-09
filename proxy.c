@@ -90,12 +90,12 @@ int parse_uri(char *uri, char *hostname, char *portnum, char *filename)
 
 int request_hdrs(int connfd, char* uri, char *hostname, char* method, char *filename, char *portnum){
   int n;
-  char buf[MAXLINE] = "";
-  char acceptbuf[MAX_OBJECT_SIZE] = "";
+  char buf[MAXLINE], acceptbuf[MAX_OBJECT_SIZE];
   rio_t rio;
   int host_fd;
   // open client socket
   char *ret = find_cache(cachelist, uri);
+  printf("uri %s\n", uri);
   if (ret != NULL){
     Rio_writen(connfd, ret, MAX_OBJECT_SIZE);
     return;
@@ -108,15 +108,15 @@ int request_hdrs(int connfd, char* uri, char *hostname, char* method, char *file
   sprintf(buf, "%s%s", buf, user_agent_hdr);
   sprintf(buf, "%sConnection: close\r\n", buf);
   sprintf(buf, "%sProxy-Connection: close\r\n\r\n", buf);
-  // printf("%s", buf);
-  // srcfd = getaddrinfo(hostname, NULL, &hints, &listp);
-  // srcfd = Open_clientfd(hostname, portnum);
   Rio_writen(host_fd, buf, strlen(buf));
   printf("Request Headers:\n");
   printf("%s", buf);
 
-  Rio_readnb(host_fd, acceptbuf, MAX_OBJECT_SIZE);
+  Rio_readnb(&rio, acceptbuf, MAX_OBJECT_SIZE);
   insert_cache(cachelist, uri, acceptbuf);
+  printf("cachelist size %d\n", cachelist->current_length);
+  printf("cachelist head %s\n", cachelist->front->head);
+//  printf("cachelist data %s\n", cachelist->front->payload);
   Rio_writen(connfd, acceptbuf, MAX_OBJECT_SIZE);
   Close(host_fd);
   return host_fd;
@@ -162,6 +162,5 @@ int main(int ac, char **av)
     printf("Accepted connection from (%s, %s)\n", hostname, port);
     sbuf_insert(&sbuf, connfd);
   }
-  del_cache(cachelist);
-  return 0;
+  //del_cache(cachelist);
 }

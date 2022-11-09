@@ -13,7 +13,7 @@ char* find_cache(cache_list* lst, char *url){
         return NULL; //  if cache lst is empty
     }
     for(cache_node* i = lst->front; i != NULL; i = i->next){
-        if (strcmp(i->payload, url) == 0){ // find in cache lst
+        if (strcmp(i->head, url) == 0){ // find in cache lst
             if (i == lst->rear){
                 push(lst, pop(lst));  
             } else if (i != lst->front){
