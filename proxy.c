@@ -1,26 +1,35 @@
 #include <stdio.h>
 #include "csapp.h"
 #include "sbuf.h"
+#include "cache.h"
 /* Recommended max cache and object sizes */
 #define MAX_CACHE_SIZE 1049000
 #define MAX_OBJECT_SIZE 102400
 #define MAXLINE 8192
 #define NTHREADS 4
 #define SBUFSIZE 16
+/*
+  For concurrency: pre-thread declare.
+  For caching: using semi-doubly linked list. MAX_CACHE_COUNT = max lenght of the list. here is 10.
+  not yet: protecting cache_list by P&V.
+*/
 /* You won't lose style points for including this long line in your code */
 static const char *user_agent_hdr =
     "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:10.0.3) Gecko/20120305 Firefox/10.0.3\r\n";
 
 void read_requesthdrs(rio_t *rp);
-int request_hdrs(int connfd, char *hostname, char *method,char *filename, char *portnum);
+int request_hdrs(int connfd, char* uri, char *hostname, char *method,char *filename, char *portnum);
 int echo(int connfd);
 int parse_uri(char *uri, char *hostname, char *portnum, char *filename);
+void *thread(void* fd);
 sbuf_t sbuf;
+
+static cache_list* cachelist;
 
 int echo(int connfd){
   int host_fd;
   rio_t rio_client;
-  char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE];
+  char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE], tmp[MAXLINE];
   char hostname[MAXLINE], filename[MAXLINE], portnum[MAXLINE];
   
   Rio_readinitb(&rio_client, connfd);
@@ -28,12 +37,13 @@ int echo(int connfd){
   sscanf(buf, "%s %s %s\n", method, uri, version);
   if(strcasecmp(method, "GET")){
     printf("doesn't implement %s method.", method);
-    return ;
+    return -1;
   }
-  parse_uri(uri, hostname, portnum, filename); // parsing uri -> hostname, portname, filename.
+  strcpy(tmp, uri);
+  parse_uri(tmp, hostname, portnum, filename); // parsing uri -> hostname, portname, filename.
   read_requesthdrs(&rio_client); // read last of cliet header.
 
-  request_hdrs(connfd, hostname, method, filename, portnum);
+  request_hdrs(connfd, uri, hostname, method, filename, portnum);
   return 1;
 }
 
@@ -79,17 +89,19 @@ int parse_uri(char *uri, char *hostname, char *portnum, char *filename)
   return is_port;
 }
 
-int request_hdrs(int connfd, char *hostname, char* method, char *filename, char *portnum){
+int request_hdrs(int connfd, char* uri, char *hostname, char* method, char *filename, char *portnum){
   int n;
   char buf[MAXLINE] = "";
-  char acceptbuf[MAXLINE] = "";
+  char acceptbuf[MAX_OBJECT_SIZE] = "";
   rio_t rio;
   int host_fd;
   // open client socket
+  char *ret = find_cache(cachelist, uri);
+  if (ret != NULL){
+    Rio_writen(connfd, ret, MAX_OBJECT_SIZE);
+    return;
+  }
   host_fd = Open_clientfd(hostname, portnum);
-  //   printf("connection is failed\n");
-  //   exit(1);
-  // } else printf("Connection success (%s, %s)\n", hostname, portnum);
   Rio_readinitb(&rio, host_fd);
 
   sprintf(buf, "%s /%s HTTP/1.0\r\n", method, filename);
@@ -102,13 +114,23 @@ int request_hdrs(int connfd, char *hostname, char* method, char *filename, char 
   // srcfd = Open_clientfd(hostname, portnum);
   Rio_writen(host_fd, buf, strlen(buf));
   printf("Request Headers:\n");
-  
-  while ( n = Rio_readlineb(&rio, acceptbuf, MAXLINE) > 0){
-    Rio_writen(connfd, acceptbuf, strlen(acceptbuf));
-  }
+  printf("%s", buf);
 
+  Rio_readnb(host_fd, acceptbuf, MAX_OBJECT_SIZE);
+  insert_cache(cachelist, uri, acceptbuf);
+  Rio_writen(connfd, acceptbuf, MAX_OBJECT_SIZE);
   Close(host_fd);
   return host_fd;
+}
+
+void *thread(void *connfd){
+  Pthread_detach(pthread_self());
+  while(1) {
+    int fd = sbuf_remove(&sbuf);
+    echo(fd);
+    close(fd);
+  }
+  return NULL;
 }
 
 int main(int ac, char **av)
@@ -118,7 +140,7 @@ int main(int ac, char **av)
   socklen_t clientlen;
   struct sockaddr_storage clientaddr;
   pthread_t ptid;
-
+  cachelist = cache_init();
   if (ac != 2)
   {
     fprintf(stderr, "put only one args. usage : %s <port>", av[0]);
@@ -128,27 +150,17 @@ int main(int ac, char **av)
   sbuf_init(&sbuf, SBUFSIZE);
 
   for (int i = 0; i < NTHREADS; i++){
-    Pthread_creadte(&ptid, NULL, thread, NULL);
+    Pthread_create(&ptid, NULL, thread, NULL);
   }
-
   while (1)
   {
-    clientlen = sizeof(struct sockaddr_storage);
+    clientlen = sizeof(clientaddr);
     connfd = Accept(listenfd_cli, (SA *)&clientaddr, &clientlen);
-    sbuf_insert(&sbuf, connfd);
     Getnameinfo((SA *)&clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE,
               0);
     printf("Accepted connection from (%s, %s)\n", hostname, port);
+    sbuf_insert(&sbuf, connfd);
   }
+  del_cache(cachelist);
   return 0;
-}
-
-void *thread(void *connfd){
-  Pthread_detach(pthread_self());
-  while(1) {
-    int fd = *(int *)connfd;
-    echo(fd);
-    close(fd);
-  }
-  return NULL;
 }
