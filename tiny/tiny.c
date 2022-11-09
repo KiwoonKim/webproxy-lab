@@ -78,7 +78,7 @@ void doit(int fd)
 
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg)
 {
-  char buf[MAXLINE], body[MAXBUF];
+  char buf[MAXLINE], body[MAXLINE];
 
   sprintf(body, "<html><title>Tiny Error</title>");
   sprintf(body, "%s<body bgcolor=""ffffff"">\r\n", body);
@@ -146,7 +146,7 @@ void serve_static(int fd, char *filename, int filesize)
   get_filetype(filename, filetype);
   sprintf(buf, "HTTP/1.0 200 OK\r\n");
   sprintf(buf, "%sServer : tiny web server\r\n", buf);
-  sprintf(buf, "%sConnection: close \r\n", buf);
+  sprintf(buf, "%sConnection: close\r\n", buf);
   sprintf(buf, "%sContent-length: %d\r\n", buf, filesize);
   sprintf(buf, "%sContent-type: %s\r\n\r\n", buf, filetype);
   Rio_writen(fd, buf, strlen(buf));
@@ -186,36 +186,35 @@ void serve_dynamic(int fd, char *filename, char *cgiargs)
 {
   char buf[MAXLINE], *emptylist[] = {NULL};
   int pid;
-  sigset_t mask, prev_mask;
 
   sprintf(buf, "HTTP/1.0 200 OK\r\n");
   Rio_writen(fd, buf, strlen(buf));
   sprintf(buf, "Server: Tiny Web Server\r\n");
   Rio_writen(fd, buf, strlen(buf));
-  printf("filename %s \n buf %s\n", filename, buf);
-  // if (Fork() == 0){
-  //   setenv("QUERY_STRING", cgiargs, 1);
-  //   Dup2(fd, STDOUT_FILENO);
-  //   Execve(filename, emptylist, environ);
-  // }
-  // Wait(NULL);
-  
-  signal(SIGCHLD, childHandler);
-  // Sigemptyset(&mask);
-  // Sigaddset(&mask, SIGINT);
-  if (pid = Fork() == 0)
-  {
-    printf("filename %s \n buf %s\n", filename, buf);
+  printf("filename %s\nbuf %s\n", filename, buf);
+  if (Fork() == 0){
     setenv("QUERY_STRING", cgiargs, 1);
     Dup2(fd, STDOUT_FILENO);
     Execve(filename, emptylist, environ);
-  } else {
-    // Sigprocmask(SIG_BLOCK, &mask, &prev_mask);
-    kill(pid, SIGINT);
-    // Sigprocmask(SIG_SETMASK, &prev_mask, NULL);
   }
+  Wait(NULL);
 }
-
+  
+  // signal(SIGCHLD, childHandler);
+  // Sigemptyset(&mask);
+  // Sigaddset(&mask, SIGINT);
+  // if ((pid = Fork()) == 0)
+  // {
+  //   printf("filename %s \n buf %s\n", filename, buf);
+  //   setenv("QUERY_STRING", cgiargs, 1);
+  //   Dup2(fd, STDOUT_FILENO);
+  //   Execve(filename, emptylist, environ);
+  // } else {
+    // Sigprocmask(SIG_BLOCK, &mask, &prev_mask);
+    // kill(pid, SIGINT);
+    // Sigprocmask(SIG_SETMASK, &prev_mask, NULL);
+    //}
+//}
 void childHandler(){
   int childPId, childStatus;
   childPId = wait(&childStatus);
