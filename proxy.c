@@ -33,14 +33,17 @@ int echo(int connfd){
   
   Rio_readinitb(&rio_client, connfd);
   Rio_readlineb(&rio_client, buf, MAXLINE);
+  printf("Request headers:\n");
+  printf("%s\n", buf);
   sscanf(buf, "%s %s %s\n", method, uri, version);
   if(strcasecmp(method, "GET")){
-    printf("doesn't implement %s method.", method);
+    sprintf(buf, "doesn't implement %s method.", method);
+    Rio_writen(connfd, buf, strlen(buf));
     return -1;
   }
+  read_requesthdrs(&rio_client); // read last of cliet header.
   strcpy(tmp, uri);
   parse_uri(tmp, hostname, portnum, filename); // parsing uri -> hostname, portname, filename.
-  read_requesthdrs(&rio_client); // read last of cliet header.
 
   request_hdrs(connfd, uri, hostname, method, filename, portnum);
   return 1;
@@ -89,16 +92,15 @@ int parse_uri(char *uri, char *hostname, char *portnum, char *filename)
 }
 
 int request_hdrs(int connfd, char* uri, char *hostname, char* method, char *filename, char *portnum){
-  int n;
+  int host_fd;
   char buf[MAXLINE], acceptbuf[MAX_OBJECT_SIZE];
   rio_t rio;
-  int host_fd;
   // open client socket
   char *ret = find_cache(cachelist, uri);
   printf("uri %s\n", uri);
   if (ret != NULL){
     Rio_writen(connfd, ret, MAX_OBJECT_SIZE);
-    return;
+    return 0;
   }
   host_fd = Open_clientfd(hostname, portnum);
   Rio_readinitb(&rio, host_fd);
@@ -119,7 +121,7 @@ int request_hdrs(int connfd, char* uri, char *hostname, char* method, char *file
 //  printf("cachelist data %s\n", cachelist->front->payload);
   Rio_writen(connfd, acceptbuf, MAX_OBJECT_SIZE);
   Close(host_fd);
-  return host_fd;
+  return 1;
 }
 
 void *thread(void *connfd){
@@ -157,8 +159,7 @@ int main(int ac, char **av)
   {
     clientlen = sizeof(clientaddr);
     connfd = Accept(listenfd_cli, (SA *)&clientaddr, &clientlen);
-    Getnameinfo((SA *)&clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE,
-              0);
+    Getnameinfo((SA *)&clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE, 0);
     printf("Accepted connection from (%s, %s)\n", hostname, port);
     sbuf_insert(&sbuf, connfd);
   }
