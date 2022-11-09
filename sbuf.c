@@ -1,15 +1,14 @@
 #include "csapp.h"
 #include "sbuf.h"
 
-/* Create an empty, bounded, shared FIFO buffer with n slots */
 void sbuf_init(sbuf_t *sp, int n)
 {
-    sp->buf = Calloc(n, sizeof(int)); 
-    sp->n = n;                       /* Buffer holds max of n items */
-    sp->front = sp->rear = 0;        /* Empty buffer iff front == rear */
-    Sem_init(&sp->mutex, 0, 1);      /* Binary semaphore for locking */
-    Sem_init(&sp->slots, 0, n);      /* Initially, buf has n empty slots */
-    Sem_init(&sp->items, 0, 0);      /* Initially, buf has zero data items */
+    sp->buf = Calloc(n, sizeof(int));
+    sp->n = n;
+    sp->front = sp->rear = 0;
+    Sem_init(&sp->mutex, 0, 1);
+    Sem_init(&sp->slots, 0, n);
+    Sem_init(&sp->items, 0, 0);
 }
 
 void sbuf_deinit(sbuf_t *sp)

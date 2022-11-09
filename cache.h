@@ -19,7 +19,7 @@ typedef struct cache_list{
     int current_length;
     cache_node* front;
     cache_node* rear;
-}cache_list;
+} cache_list;
 
 cache_list* cache_init(); // init cache_list.
 void insert_cache(cache_list* lst, char* url, char* data); // insert new node to cache_list.

@@ -1,11 +1,11 @@
 #include <stdio.h>
 #include "csapp.h"
-#include "sbuf.h"
 #include "cache.h"
+#include "sbuf.h"
 /* Recommended max cache and object sizes */
 #define MAX_CACHE_SIZE 1049000
 #define MAX_OBJECT_SIZE 102400
-#define MAXLINE 8192
+// #define MAXLINE 8192
 #define NTHREADS 4
 #define SBUFSIZE 16
 /*
@@ -22,12 +22,11 @@ int request_hdrs(int connfd, char* uri, char *hostname, char *method,char *filen
 int echo(int connfd);
 int parse_uri(char *uri, char *hostname, char *portnum, char *filename);
 void *thread(void* fd);
-sbuf_t sbuf;
 
+sbuf_t sbuf;
 static cache_list* cachelist;
 
 int echo(int connfd){
-  int host_fd;
   rio_t rio_client;
   char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE], tmp[MAXLINE];
   char hostname[MAXLINE], filename[MAXLINE], portnum[MAXLINE];
@@ -140,6 +139,7 @@ int main(int ac, char **av)
   socklen_t clientlen;
   struct sockaddr_storage clientaddr;
   pthread_t ptid;
+
   cachelist = cache_init();
   if (ac != 2)
   {
@@ -152,6 +152,7 @@ int main(int ac, char **av)
   for (int i = 0; i < NTHREADS; i++){
     Pthread_create(&ptid, NULL, thread, NULL);
   }
+
   while (1)
   {
     clientlen = sizeof(clientaddr);
