@@ -1,9 +1,12 @@
 #include <stdio.h>
 #include "csapp.h"
+#include "sbuf.h"
 /* Recommended max cache and object sizes */
 #define MAX_CACHE_SIZE 1049000
 #define MAX_OBJECT_SIZE 102400
 #define MAXLINE 8192
+#define NTHREADS 4
+#define SBUFSIZE 16
 /* You won't lose style points for including this long line in your code */
 static const char *user_agent_hdr =
     "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:10.0.3) Gecko/20120305 Firefox/10.0.3\r\n";
@@ -12,6 +15,7 @@ void read_requesthdrs(rio_t *rp);
 int request_hdrs(int connfd, char *hostname, char *method,char *filename, char *portnum);
 int echo(int connfd);
 int parse_uri(char *uri, char *hostname, char *portnum, char *filename);
+sbuf_t sbuf;
 
 int echo(int connfd){
   int host_fd;
@@ -100,7 +104,6 @@ int request_hdrs(int connfd, char *hostname, char* method, char *filename, char 
   printf("Request Headers:\n");
   
   while ( n = Rio_readlineb(&rio, acceptbuf, MAXLINE) > 0){
-    printf("%s", acceptbuf);
     Rio_writen(connfd, acceptbuf, strlen(acceptbuf));
   }
 
@@ -110,10 +113,11 @@ int request_hdrs(int connfd, char *hostname, char* method, char *filename, char 
 
 int main(int ac, char **av)
 {
-  int listenfd_cli, connfd, connfd_host;
+  int listenfd_cli, connfd;
   char hostname[MAXLINE], port[MAXLINE];
   socklen_t clientlen;
   struct sockaddr_storage clientaddr;
+  pthread_t ptid;
 
   if (ac != 2)
   {
@@ -121,16 +125,30 @@ int main(int ac, char **av)
     exit(1);
   }
   listenfd_cli = Open_listenfd(av[1]); // open listen socket for client.
+  sbuf_init(&sbuf, SBUFSIZE);
+
+  for (int i = 0; i < NTHREADS; i++){
+    Pthread_creadte(&ptid, NULL, thread, NULL);
+  }
 
   while (1)
   {
     clientlen = sizeof(struct sockaddr_storage);
     connfd = Accept(listenfd_cli, (SA *)&clientaddr, &clientlen);
+    sbuf_insert(&sbuf, connfd);
     Getnameinfo((SA *)&clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE,
               0);
     printf("Accepted connection from (%s, %s)\n", hostname, port);
-    printf("echo result : %d\n", echo(connfd));
-    close(connfd);
   }
   return 0;
+}
+
+void *thread(void *connfd){
+  Pthread_detach(pthread_self());
+  while(1) {
+    int fd = *(int *)connfd;
+    echo(fd);
+    close(fd);
+  }
+  return NULL;
 }
